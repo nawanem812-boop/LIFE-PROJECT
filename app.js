@@ -18,6 +18,15 @@ const M={
   formations:{n:'Formations',f:[['titre','Formation / certification','t'],['plat','Plateforme / Organisme','t'],['stat','Statut','s',['À commencer','En cours','Validé']],['prog','Progression %','n'],['util','Utilité pour le plan','a']]}
 };
 
+const SK=[
+  ['Sciences fondamentales + clinique',1],
+  ['Anglais scientifique',2],
+  ['Méthodologie de recherche',3],
+  ['Réseau & publications',4],
+  ['Discipline personnelle & santé',5]
+];
+if(!D.comp) D.comp=SK.map(()=>0);
+
 const TABS=[
   ['home','🏠 Accueil'],
   ['stages','🏥 Stages'],
@@ -38,14 +47,33 @@ function nav(){
   if(el) el.innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'active':''}" onclick="go('${k}')">${l}</button>`).join('');
 }
 
+function setComp(i, v){
+  D.comp[i]=Number(v);
+  save();
+  render();
+}
+
 function renderHome(){
   const st=L('stages').length;
   const re=L('recherche').length;
   const pu=L('publications').length;
   const fo=L('formations').filter(x=>x.stat==='Validé').length;
+  const pa=L('passerelle').length;
   
-  // Calcul d'un score de progression globale (indicatif)
-  const score = Math.min(100, (st * 20) + (re * 10) + (pu * 25) + (fo * 15));
+  // Progression globale basée sur les compétences et items
+  const compAvg = D.comp.reduce((a,b)=>a+b,0) / (SK.length * 5) * 100;
+  const itemsScore = Math.min(100, (st*15)+(re*10)+(pu*20)+(fo*10)+(pa*10));
+  const score = Math.round((compAvg * 0.4) + (itemsScore * 0.6));
+
+  const compList = SK.map(([lbl], i)=>`
+    <div style="margin-top:8px;">
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:2px;">
+        <span>${lbl}</span>
+        <span><strong>${D.comp[i]||0}/5</strong></span>
+      </div>
+      <input type="range" min="0" max="5" value="${D.comp[i]||0}" onchange="setComp(${i}, this.value)" style="width:100%;">
+    </div>
+  `).join('');
 
   return `
     <div class="card">
@@ -57,21 +85,29 @@ function renderHome(){
         <button onclick="exportData()" class="btn-primary" style="padding:6px 12px; font-size:12px;">💾 Exporter .json</button>
       </div>
 
-      <div style="margin-top:20px; background:rgba(255,255,255,0.05); padding:15px; border-radius:8px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-          <strong>📊 Progression globale du dossier</strong>
+      <!-- Progression / Chance -->
+      <div style="margin-top:15px; background:rgba(255,255,255,0.05); padding:12px; border-radius:8px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <strong>📊 Estimation de préparation du dossier</strong>
           <span><strong>${score}%</strong></span>
         </div>
         <div style="width:100%; background:rgba(255,255,255,0.1); height:10px; border-radius:5px; overflow:hidden;">
-          <div style="width:${score}%; background:var(--accent, #4CAF50); height:100%; transition:width 0.3s;"></div>
+          <div style="width:${score}%; background:var(--accent, #4CAF50); height:100%;"></div>
         </div>
       </div>
 
-      <div class="dash-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:15px;">
-        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:20px; font-weight:bold;">${st}</div><div class="stat-l" style="font-size:12px;">stages validés</div></div>
-        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:20px; font-weight:bold;">${re}</div><div class="stat-l" style="font-size:12px;">fiches recherche</div></div>
-        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:20px; font-weight:bold;">${pu}</div><div class="stat-l" style="font-size:12px;">publications/posters</div></div>
-        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:20px; font-weight:bold;">${fo}</div><div class="stat-l" style="font-size:12px;">certifications acquises</div></div>
+      <!-- Statistiques clés -->
+      <div class="dash-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:10px; margin-top:15px;">
+        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:18px; font-weight:bold;">${st}</div><div class="stat-l" style="font-size:11px;">stages validés</div></div>
+        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:18px; font-weight:bold;">${re}</div><div class="stat-l" style="font-size:11px;">fiches recherche</div></div>
+        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:18px; font-weight:bold;">${pu}</div><div class="stat-l" style="font-size:11px;">publications</div></div>
+        <div class="card stat-card" style="text-align:center; padding:10px;"><div class="stat-n" style="font-size:18px; font-weight:bold;">${pa}</div><div class="stat-l" style="font-size:11px;">preuves dossier</div></div>
+      </div>
+
+      <!-- Auto-évaluation compétences -->
+      <div style="margin-top:20px;">
+        <h3>🧠 Auto-évaluation des Compétences Clés</h3>
+        ${compList}
       </div>
     </div>
   `;
@@ -83,7 +119,7 @@ function renderPortfolio(){
   const forms = L('formations').map(x => `<li><strong>${esc(x.titre||'')}</strong> (${esc(x.plat||'')}) — Statut : ${esc(x.stat||'')} (${esc(x.prog||0)}%)</li>`).join('') || '<p style="opacity:0.6;">Aucune formation renseignée.</p>';
 
   return `
-    <div class="card" id="portfolio-printable">
+    <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h2>📋 Portfolio & Synthèse de Progression</h2>
         <button onclick="window.print()" class="btn-primary" style="padding:6px 12px;">🖨️ Imprimer / Exporter PDF</button>
